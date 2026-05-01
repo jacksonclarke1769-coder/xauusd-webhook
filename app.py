@@ -36,7 +36,11 @@ def send_whatsapp(message):
 
 def parse_signal(body):
     signal = {"raw": body, "setup": "?", "direction": "?", "entry": None, "sl": None, "tp": None, "lots": None, "type": "ENTRY"}
-    if "CONFIRMED" in body:
+    if "TP HIT" in body:
+        signal["type"] = "TP_HIT"
+    elif "SL HIT" in body:
+        signal["type"] = "SL_HIT"
+    elif "CONFIRMED" in body:
         signal["type"] = "CONFLUENCE"
     elif "REVERSAL" in body:
         signal["type"] = "REVERSAL"
@@ -54,14 +58,23 @@ def parse_signal(body):
 
 def format_message(signal):
     now = datetime.utcnow().strftime("%d/%m %H:%M UTC")
+    raw = signal["raw"]
     if signal["type"] == "CONFLUENCE":
-        return f"CONFIRMED BIAS XAUUSD {now} Action: CLOSE D re-enter as higher setup Entry: {signal['entry']} New SL: {signal['sl']} New TP: {signal['tp']}"
+        return "CONFIRMED BIAS XAUUSD " + now + " CLOSE D re-enter higher setup Entry:" + str(signal["entry"]) + " SL:" + str(signal["sl"]) + " TP:" + str(signal["tp"])
     if signal["type"] == "REVERSAL":
-        d = "LONG" if "LONG" in signal["raw"] else "SHORT"
-        return f"REVERSAL WARNING XAUUSD {now} {d} fired AGAINST open D trade CLOSE D NOW Level: {signal['entry']}"
+        d = "LONG" if "LONG" in raw else "SHORT"
+        return "REVERSAL WARNING XAUUSD " + now + " " + d + " fired AGAINST open D CLOSE D NOW Level:" + str(signal["entry"])
+    if signal["type"] == "TP_HIT":
+        setup = signal.get("setup","?")
+        profit = {"B":1875,"C":1000,"D":250}.get(setup, 250)
+        return "TP HIT XAUUSD " + now + " Setup " + setup + " Entry:" + str(signal["entry"]) + " TP:" + str(signal["tp"]) + " WINNER +$" + str(profit)
+    if signal["type"] == "SL_HIT":
+        setup = signal.get("setup","?")
+        loss = {"B":750,"C":500,"D":100}.get(setup, 100)
+        return "SL HIT XAUUSD " + now + " Setup " + setup + " Entry:" + str(signal["entry"]) + " SL:" + str(signal["sl"]) + " LOSER -$" + str(loss)
     direction = signal["direction"]
     risk = {"B":"1.5%","C":"1.0%","D":"0.2%"}.get(signal["setup"],"")
-    return f"XAUUSD {signal['setup']} {direction} {now} Entry:{signal['entry']} SL:{signal['sl']} TP:{signal['tp']} Lots:{signal['lots']} Risk:{risk}"
+    return "XAUUSD " + signal["setup"] + " " + direction + " " + now + " Entry:" + str(signal["entry"]) + " SL:" + str(signal["sl"]) + " TP:" + str(signal["tp"]) + " Lots:" + str(signal["lots"]) + " Risk:" + risk
 
 
 @app.route("/", methods=["GET"])
@@ -77,7 +90,7 @@ def webhook():
         signal = parse_signal(body)
         message = format_message(signal)
         sent = send_whatsapp(message)
-        return jsonify({"status": "ok" if sent else "failed", "setup": signal["setup"], "direction": signal["direction"]}), 200
+        return jsonify({"status": "ok" if sent else "failed", "type": signal["type"], "setup": signal["setup"]}), 200
     except Exception as e:
         log.error(f"Error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
