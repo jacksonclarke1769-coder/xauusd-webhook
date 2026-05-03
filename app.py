@@ -162,6 +162,40 @@ def broadcast():
 def summary():
     msg=build_weekly_summary(); sent=send_all(msg); return jsonify({"status":"ok" if sent else "failed","message":msg}),200
 
+@app.route("/send_intro", methods=["GET"])
+def send_intro():
+    """One-time send of intro message to all channels"""
+    msg = """XAUUSD Signal System
+
+Automated gold trading signals during London session, Mon-Fri, 3pm-7pm Perth time.
+
+You will see 2 messages per trade:
+
+- Entry alert with setup, entry price, SL, TP, and lots
+
+- Close result from MT5 with real broker P&L (✅ win or ❌ loss)
+
+Setup types:
+
+B = 5-day breakout (rare, 1.5% risk)
+
+C = London reversal (1% risk)
+
+D = Intraday trend (most frequent, 0.2% risk)
+
+CONFIRMED BIAS = strong same-direction signal
+
+REVERSAL = close current trade
+
+How to follow: Don't copy lot sizes directly, they're set for my account. Ask me for sizing help.
+
+16-year backtest (2009-2025) on $50k account:
+
+Profitable every single year. Best year +$78k (2010). Worst year +$30k (2023). Total +$849k across 8,972 trades. Win rate 55%. Max drawdown -2.5%. Worst single day -$1,263.
+
+Reality check: Past performance is not future results. Some days will lose. Long-term edge is the goal."""
+    sent = send_all(msg)
+    return jsonify({"status": "ok" if sent else "failed", "preview": msg[:200]}), 200
 @app.route("/stats",methods=["GET"])
 def stats():
     with stats_lock: return jsonify(weekly_stats),200
