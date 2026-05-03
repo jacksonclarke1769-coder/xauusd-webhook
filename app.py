@@ -117,7 +117,9 @@ def health():
 def webhook():
     try:
         body=request.get_data(as_text=True).strip()
-        sig=parse_signal(body); msg=format_message(sig); sent=send_all(msg)
+        sig=parse_signal(body); msg=format_message(sig)
+        sent=False
+        if sig["type"] not in ("TP_HIT","SL_HIT"): sent=send_all(msg)
         if sig["type"]=="ENTRY" and sig["entry"]:
             signal_counter[0]+=1
             m={"id":str(signal_counter[0]),"setup":sig["setup"],"direction":sig["direction"],"entry":sig["entry"],"sl":sig["sl"],"tp":sig["tp"],"lots":sig["lots"] or 0.01,"time":datetime.utcnow().strftime("%Y%m%d%H%M%S")}
@@ -136,7 +138,16 @@ def pending_signal():
 @app.route("/trade_result",methods=["POST"])
 def trade_result():
     try:
-        d=request.get_json(); record_trade(d.get("setup","?"),d.get("direction","?"),d.get("result","LOSS"),abs(float(d.get("pnl",0)))); return jsonify({"status":"ok"}),200
+        d=request.get_json()
+        setup=d.get("setup","?"); direction=d.get("direction","?"); result=d.get("result","LOSS"); pnl=float(d.get("pnl",0))
+        record_trade(setup,direction,result,abs(pnl))
+        icon="✅" if pnl>=0 else "❌"
+        pnl_str=("+$" if pnl>=0 else "-$")+"{:.2f}".format(abs(pnl))
+        entry_str="{:.2f}".format(float(d["entry"])) if d.get("entry") else "N/A"
+        tp_sl="TP HIT" if result=="WIN" else "SL HIT"
+        msg="{} MT5 CLOSED — Setup {} {}\nResult: {}\nEntry: {}\nP&L: {}".format(icon,setup,direction,tp_sl,entry_str,pnl_str)
+        send_all(msg)
+        return jsonify({"status":"ok"}),200
     except: return jsonify({"status":"error"}),500
 
 @app.route("/broadcast",methods=["POST"])
